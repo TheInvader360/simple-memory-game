@@ -1,7 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
+	"math/rand"
+	"os"
+	"time"
 
 	"github.com/hajimehoshi/ebiten"
 )
@@ -20,8 +24,17 @@ var (
 	yellowDark  = &color.NRGBA{0x33, 0x33, 0x00, 0xff}
 	yellowLight = &color.NRGBA{0xff, 0xff, 0x00, 0xff}
 
-	pads []pad
+	targetSequence sequence
+	pads           []pad
+	level          int
+	demo           bool
+	tickCounter    int
 )
+
+type sequence struct {
+	values       []int
+	currentIndex int
+}
 
 type pad struct {
 	x, y              float64
@@ -30,6 +43,14 @@ type pad struct {
 }
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
+
+	targetSequence.values = make([]int, 30)
+	for index := range targetSequence.values {
+		targetSequence.values[index] = rand.Intn(4)
+	}
+	fmt.Println(targetSequence.values)
+
 	blueDarkImage, _ := ebiten.NewImage(padSize, padSize, ebiten.FilterDefault)
 	blueDarkImage.Fill(blueDark)
 	blueLightImage, _ := ebiten.NewImage(padSize, padSize, ebiten.FilterDefault)
@@ -51,19 +72,42 @@ func init() {
 	pads = append(pads, pad{screenSize - padSize, 0, false, greenDarkImage, greenLightImage})
 	pads = append(pads, pad{0, screenSize - padSize, false, redDarkImage, redLightImage})
 	pads = append(pads, pad{screenSize - padSize, screenSize - padSize, false, yellowDarkImage, yellowLightImage})
+
+	level = 10
+
+	demo = true
 }
 
 func update(screen *ebiten.Image) error {
-	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-		pads[0].on = true
-		pads[1].on = false
-		pads[2].on = false
-		pads[3].on = true
-	} else {
-		pads[0].on = false
-		pads[1].on = true
-		pads[2].on = true
-		pads[3].on = false
+	tickCounter++
+
+	if demo {
+		if targetSequence.currentIndex < level {
+			if tickCounter == 1 {
+				pads[0].on = false
+				pads[1].on = false
+				pads[2].on = false
+				pads[3].on = false
+				pads[targetSequence.values[targetSequence.currentIndex]].on = true
+			}
+			if tickCounter == 41 {
+				pads[0].on = false
+				pads[1].on = false
+				pads[2].on = false
+				pads[3].on = false
+			}
+			if tickCounter == 61 {
+				tickCounter = 0
+				targetSequence.currentIndex++
+			}
+		} else {
+			targetSequence.currentIndex = 0
+			demo = false
+		}
+	}
+
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
+		os.Exit(0)
 	}
 
 	if ebiten.IsDrawingSkipped() {
