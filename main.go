@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"math/rand"
 	"os"
@@ -15,6 +16,13 @@ const (
 )
 
 var (
+	targetSequence sequence
+	pads           []pad
+	level          int
+	demo           bool
+	listening      bool
+	tickCounter    int
+
 	blueDark    = &color.NRGBA{0x00, 0x00, 0x33, 0xff}
 	blueLight   = &color.NRGBA{0x00, 0x00, 0xff, 0xff}
 	greenDark   = &color.NRGBA{0x00, 0x33, 0x00, 0xff}
@@ -23,12 +31,6 @@ var (
 	redLight    = &color.NRGBA{0xff, 0x00, 0x00, 0xff}
 	yellowDark  = &color.NRGBA{0x33, 0x33, 0x00, 0xff}
 	yellowLight = &color.NRGBA{0xff, 0xff, 0x00, 0xff}
-
-	targetSequence sequence
-	pads           []pad
-	level          int
-	demo           bool
-	tickCounter    int
 )
 
 type sequence struct {
@@ -73,7 +75,7 @@ func init() {
 	pads = append(pads, pad{0, screenSize - padSize, false, redDarkImage, redLightImage})
 	pads = append(pads, pad{screenSize - padSize, screenSize - padSize, false, yellowDarkImage, yellowLightImage})
 
-	level = 10
+	level = 3
 
 	demo = true
 }
@@ -84,17 +86,11 @@ func update(screen *ebiten.Image) error {
 	if demo {
 		if targetSequence.currentIndex < level {
 			if tickCounter == 1 {
-				pads[0].on = false
-				pads[1].on = false
-				pads[2].on = false
-				pads[3].on = false
+				allPadsOff()
 				pads[targetSequence.values[targetSequence.currentIndex]].on = true
 			}
 			if tickCounter == 41 {
-				pads[0].on = false
-				pads[1].on = false
-				pads[2].on = false
-				pads[3].on = false
+				allPadsOff()
 			}
 			if tickCounter == 61 {
 				tickCounter = 0
@@ -103,6 +99,20 @@ func update(screen *ebiten.Image) error {
 		} else {
 			targetSequence.currentIndex = 0
 			demo = false
+			listening = true
+		}
+	}
+
+	if listening {
+		allPadsOff()
+		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+			posX, posY := ebiten.CursorPosition()
+			pos := image.Point{posX, posY}
+			for index, pad := range pads {
+				if pos.In(pad.imageOff.Bounds().Add(image.Point{int(pad.x), int(pad.y)})) {
+					pads[index].on = true
+				}
+			}
 		}
 	}
 
@@ -125,6 +135,12 @@ func update(screen *ebiten.Image) error {
 	}
 
 	return nil
+}
+
+func allPadsOff() {
+	for index := range pads {
+		pads[index].on = false
+	}
 }
 
 func main() {
