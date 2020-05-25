@@ -42,6 +42,13 @@ type pad struct {
 	imageOff, imageOn *ebiten.Image
 }
 
+func (pad pad) image() *ebiten.Image {
+	if pad.on {
+		return pad.imageOn
+	}
+	return pad.imageOff
+}
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 
@@ -137,11 +144,7 @@ func update(screen *ebiten.Image) error {
 	for _, pad := range pads {
 		opts := &ebiten.DrawImageOptions{}
 		opts.GeoM.Translate(pad.x, pad.y)
-		if pad.on {
-			screen.DrawImage(pad.imageOn, opts)
-		} else {
-			screen.DrawImage(pad.imageOff, opts)
-		}
+		screen.DrawImage(pad.image(), opts)
 	}
 
 	return nil
@@ -155,7 +158,7 @@ func allPadsOff() {
 
 func getPadAtPos(pos *image.Point) *pad {
 	for index, pad := range pads {
-		if pos.In(pad.imageOff.Bounds().Add(image.Point{int(pad.x), int(pad.y)})) {
+		if pos.In(pad.image().Bounds().Add(image.Point{int(pad.x), int(pad.y)})) {
 			return &pads[index]
 		}
 	}
