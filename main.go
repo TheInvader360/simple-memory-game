@@ -8,16 +8,21 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang/freetype/truetype"
 	"github.com/hajimehoshi/ebiten"
+	"github.com/hajimehoshi/ebiten/examples/resources/fonts"
+	"github.com/hajimehoshi/ebiten/text"
+	"golang.org/x/image/font"
 )
 
 const (
-	screenSize, padSize, minLevel, maxLevel, newLevelDelayTicks, lightTicks, darkTicks = 480, 220, 1, 5, 60, 40, 20
+	screenSize, padSize, minLevel, maxLevel, newLevelDelayTicks, lightTicks, darkTicks, gameOverFlashTicks, gameOverTitle, gameOverInstruction = 480, 220, 1, 20, 60, 40, 20, 30, "GAME OVER", "TOUCH/CLICK TO START A NEW GAME"
 )
 
 const (
 	demo = iota
 	play
+	over
 )
 
 var (
@@ -25,6 +30,8 @@ var (
 	pads                                   []pad
 	lastPressedPad                         *pad
 	level, mode, currentIndex, tickCounter int
+	gameOverMessage                        string
+	smallFont, mediumFont, largeFont       font.Face
 
 	blueDark    = &color.NRGBA{0x00, 0x00, 0x33, 0xff}
 	blueLight   = &color.NRGBA{0x00, 0x00, 0xff, 0xff}
@@ -52,10 +59,25 @@ func (pad pad) image() *ebiten.Image {
 func init() {
 	rand.Seed(time.Now().UnixNano())
 
-	sequence = make([]int, maxLevel)
-	for index := range sequence {
-		sequence[index] = rand.Intn(4)
+	tt, err := truetype.Parse(fonts.ArcadeN_ttf)
+	if err != nil {
+		panic(err)
 	}
+	smallFont = truetype.NewFace(tt, &truetype.Options{
+		Size:    14,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	mediumFont = truetype.NewFace(tt, &truetype.Options{
+		Size:    20,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	largeFont = truetype.NewFace(tt, &truetype.Options{
+		Size:    48,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
 
 	blueDarkImage, _ := ebiten.NewImage(padSize, padSize, ebiten.FilterDefault)
 	blueDarkImage.Fill(blueDark)
@@ -79,8 +101,7 @@ func init() {
 	pads = append(pads, pad{0, screenSize - padSize, false, redDarkImage, redLightImage})
 	pads = append(pads, pad{screenSize - padSize, screenSize - padSize, false, yellowDarkImage, yellowLightImage})
 
-	level = minLevel - 1
-	nextLevel()
+	newGame()
 }
 
 func update(screen *ebiten.Image) error {
@@ -106,8 +127,13 @@ func update(screen *ebiten.Image) error {
 	case play:
 		allPadsOff()
 		triggerPad := -1
-		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-			posX, posY := ebiten.CursorPosition()
+		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) || len(ebiten.TouchIDs()) > 0 {
+			var posX, posY int
+			if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+				posX, posY = ebiten.CursorPosition()
+			} else {
+				posX, posY = ebiten.TouchPosition(0)
+			}
 			pos := image.Point{posX, posY}
 			pad := getPadAtPos(&pos)
 			if pad != nil {
@@ -128,23 +154,40 @@ func update(screen *ebiten.Image) error {
 					nextLevel()
 				}
 			} else {
-				gameOver(fmt.Sprintf("LOST AT LEVEL %d", level))
+				gameOver(fmt.Sprintf("YOU REACHED LEVEL %d", level))
 			}
+		}
+	case over:
+		tickCounter++
+		if tickCounter > gameOverFlashTicks*2 {
+			tickCounter = 0
+		}
+		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) || len(ebiten.TouchIDs()) > 0 {
+			newGame()
 		}
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		gameOver("QUIT")
+		os.Exit(0)
 	}
 
 	if ebiten.IsDrawingSkipped() {
 		return nil
 	}
 
-	for _, pad := range pads {
-		opts := &ebiten.DrawImageOptions{}
-		opts.GeoM.Translate(pad.x, pad.y)
-		screen.DrawImage(pad.image(), opts)
+	switch mode {
+	case over:
+		text.Draw(screen, gameOverTitle, largeFont, (screenSize-text.MeasureString(gameOverTitle, largeFont).X)/2, screenSize*0.25, redLight)
+		text.Draw(screen, gameOverMessage, mediumFont, (screenSize-text.MeasureString(gameOverMessage, mediumFont).X)/2, screenSize*0.5, greenLight)
+		if tickCounter > gameOverFlashTicks {
+			text.Draw(screen, gameOverInstruction, smallFont, (screenSize-text.MeasureString(gameOverInstruction, smallFont).X)/2, screenSize*0.75, yellowLight)
+		}
+	default:
+		for _, pad := range pads {
+			opts := &ebiten.DrawImageOptions{}
+			opts.GeoM.Translate(pad.x, pad.y)
+			screen.DrawImage(pad.image(), opts)
+		}
 	}
 
 	return nil
@@ -178,9 +221,19 @@ func releaseLastPressedPad() int {
 	return returnVal
 }
 
+func newGame() {
+	sequence = make([]int, maxLevel)
+	for index := range sequence {
+		sequence[index] = rand.Intn(4)
+	}
+
+	level = minLevel - 1
+	nextLevel()
+}
+
 func nextLevel() {
 	if level == maxLevel {
-		gameOver("COMPLETED")
+		gameOver(fmt.Sprintf("YOU BEAT ALL %v LEVELS!", level))
 	} else {
 		level++
 		currentIndex = 0
@@ -192,7 +245,9 @@ func nextLevel() {
 
 func gameOver(message string) {
 	fmt.Println(message)
-	os.Exit(0)
+	tickCounter = 0
+	mode = over
+	gameOverMessage = message
 }
 
 func main() {
