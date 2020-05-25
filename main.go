@@ -12,15 +12,19 @@ import (
 )
 
 const (
-	screenSize, padSize, minLevel, maxLevel, newLevelDelayTicks, lightTicks, darkTicks = 480, 220, 1, 10, 60, 40, 20
+	screenSize, padSize, minLevel, maxLevel, newLevelDelayTicks, lightTicks, darkTicks = 480, 220, 1, 5, 60, 40, 20
+)
+
+const (
+	demo = iota
+	play
 )
 
 var (
-	sequence                         []int
-	pads                             []pad
-	lastPressedPad                   *pad
-	demoMode, playMode               bool
-	level, currentIndex, tickCounter int
+	sequence                               []int
+	pads                                   []pad
+	lastPressedPad                         *pad
+	level, mode, currentIndex, tickCounter int
 
 	blueDark    = &color.NRGBA{0x00, 0x00, 0x33, 0xff}
 	blueLight   = &color.NRGBA{0x00, 0x00, 0xff, 0xff}
@@ -73,7 +77,8 @@ func init() {
 }
 
 func update(screen *ebiten.Image) error {
-	if demoMode {
+	switch mode {
+	case demo:
 		tickCounter++
 		if currentIndex < level {
 			if tickCounter == 1 {
@@ -89,12 +94,9 @@ func update(screen *ebiten.Image) error {
 			}
 		} else {
 			currentIndex = 0
-			demoMode = false
-			playMode = true
+			mode = play
 		}
-	}
-
-	if playMode {
+	case play:
 		allPadsOff()
 		triggerPad := -1
 		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
@@ -180,8 +182,7 @@ func nextLevel() {
 		level++
 		currentIndex = 0
 		tickCounter = -newLevelDelayTicks
-		demoMode = true
-		playMode = false
+		mode = demo
 		fmt.Println(fmt.Sprintf("LEVEL %v", level))
 	}
 }
