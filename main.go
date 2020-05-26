@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	screenSize, padSize, minLevel, maxLevel, newLevelDelayTicks, lightTicks, darkTicks, gameOverFlashTicks, gameOverTitle, gameOverInstruction = 480, 220, 1, 20, 60, 40, 20, 30, "GAME OVER", "TOUCH/CLICK TO START A NEW GAME"
+	screenSize, padSize, minLevel, maxLevel, newLevelDelayTicks, lightTicks, darkTicks, gameOverDelayTicks, gameOverFlashTicks, gameOverTitle, gameOverInstruction = 480, 220, 1, 20, 60, 40, 20, 120, 30, "GAME OVER", "TOUCH/CLICK TO START A NEW GAME"
 )
 
 const (
@@ -162,7 +162,7 @@ func update(screen *ebiten.Image) error {
 		if tickCounter > gameOverFlashTicks*2 {
 			tickCounter = 0
 		}
-		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) || len(ebiten.TouchIDs()) > 0 {
+		if tickCounter >= 0 && (ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) || len(ebiten.TouchIDs()) > 0) {
 			newGame()
 		}
 	}
@@ -245,7 +245,7 @@ func nextLevel() {
 
 func gameOver(message string) {
 	fmt.Println(message)
-	tickCounter = 0
+	tickCounter = -gameOverDelayTicks
 	mode = over
 	gameOverMessage = message
 }
